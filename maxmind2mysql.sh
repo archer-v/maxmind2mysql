@@ -341,6 +341,7 @@ if [ ${force_update} -eq 1 ]; then
     echo "Testing..."
     perform_sql_op "$sql_test_country"
     perform_sql_op "$sql_test_asn"
+    echo "Done"
 else 
     echo "$file files isn't changed, update skipped"
 fi
