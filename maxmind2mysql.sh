@@ -1,6 +1,11 @@
 #!/bin/bash
 # Fetch maxmind data files and update local mysql tables
 
+# change working dir
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(realpath "$SCRIPT_DIR")"
+cd $SCRIPT_DIR
+
 source ./config.env
 
 #maxmind_license_key=""
@@ -22,7 +27,6 @@ force_update=0
 #db_host=""
 data_dir="unpacked"
 download_url_prefix="https://${maxmind_user_id}:${maxmind_license_key}@download.maxmind.com/geoip/databases"
-
 
 [ -d "$data_dir" ] || force_update=1
 
