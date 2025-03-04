@@ -62,5 +62,5 @@ The script can be scheduled to run periodically using `cron`, ensuring that the 
 Example crontab entry to run the script daily at midnight:
 
 ```bash
-0 0 * * * /path/to/import_maxmind.sh
+0 0 * * * /path/to/maxmind2mysql.sh
 ```
