@@ -39,7 +39,6 @@ CREATE TABLE IF NOT EXISTS maxmind_ip_asn (
     network_start varbinary(16) not null,
     network_end varbinary(16) not null,
     asn INT,
-    country_iso_code CHAR(2),
     PRIMARY KEY(network, prefix),
     index(network_start),
     index(network_end)
