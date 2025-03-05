@@ -272,7 +272,11 @@ check_file_in_arch() {
 
 perform_sql_op() {
     echo "Performing SQL request..."
-    sql_result=$(echo "$1" | mysql -h"$db_host" -u"$db_user" -p"$db_pass" "$db_name" -N)
+    cred=""
+    [ -n "$db_host" ] && cred="-h $db_host"
+    [ -n "$db_user" ] && cred="$cred -u $db_user"
+    [ -n "$db_pass" ] && cred="$cred -p$db_pass"
+    sql_result=$(echo "$1" | mysql $cred "$db_name" -N)
     echo "$sql_result"
 }
 
