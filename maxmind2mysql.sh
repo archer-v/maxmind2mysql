@@ -96,7 +96,7 @@ LINES TERMINATED BY '\n'
 IGNORE 1 LINES
 (geoname_id, @locale_code, @continent_code, @continent_name, country_iso_code);
 
-CREATE TABLE IF NOT EXISTS maxmind_ip_countries_tmp (
+CREATE TABLE IF NOT EXISTS maxmind_ip_country_tmp (
     network VARBINARY(16) NOT NULL,
     prefix INT NOT NULL,
     network_start varbinary(16) not null,
@@ -107,10 +107,10 @@ CREATE TABLE IF NOT EXISTS maxmind_ip_countries_tmp (
     index(network_end)
 );
 
-TRUNCATE TABLE maxmind_ip_countries_tmp;
+TRUNCATE TABLE maxmind_ip_country_tmp;
 
 LOAD DATA LOCAL INFILE '$data_dir/$ipv4_country_csv'
-INTO TABLE maxmind_ip_countries_tmp
+INTO TABLE maxmind_ip_country_tmp
 FIELDS TERMINATED BY ',' ENCLOSED BY '\"'
 LINES TERMINATED BY '\n'
 IGNORE 1 LINES
@@ -121,7 +121,7 @@ SET
     network_start = unhex(@network_start),
     network_end = unhex(@network_end);
 
-CREATE TABLE IF NOT EXISTS maxmind_ip_countries (
+CREATE TABLE IF NOT EXISTS maxmind_ip_country (
     network VARBINARY(16) NOT NULL,
     prefix INT NOT NULL,
     network_start varbinary(16) not null,
@@ -133,20 +133,20 @@ CREATE TABLE IF NOT EXISTS maxmind_ip_countries (
     index(network_end)
 );
 
-TRUNCATE TABLE maxmind_ip_countries;
+TRUNCATE TABLE maxmind_ip_country;
 
-INSERT INTO maxmind_ip_countries (network, prefix, network_start, network_end, country_iso_code)
+INSERT INTO maxmind_ip_country (network, prefix, network_start, network_end, country_iso_code)
 SELECT 
     ir.network,
     ir.prefix,
     ir.network_start,
     ir.network_end,
     ci.country_iso_code
-FROM maxmind_ip_countries_tmp AS ir
+FROM maxmind_ip_country_tmp AS ir
 LEFT JOIN maxmind_country_info_tmp AS ci
     ON ir.country_id = ci.geoname_id;
 
-DROP TABLE IF EXISTS maxmind_ip_countries_tmp;
+DROP TABLE IF EXISTS maxmind_ip_country_tmp;
 DROP TABLE IF EXISTS maxmind_country_info_tmp;
 "
 
@@ -154,7 +154,7 @@ sql_test_country="
 select CONCAT(INET6_NTOA(network), '/', prefix) as network, country_iso_code
 from (
   select *
-  from maxmind_ip_countries
+  from maxmind_ip_country
   where
     length(inet6_aton('214.0.0.0')) = length(network_start)
     and inet6_aton('214.0.0.0') >= network_start
