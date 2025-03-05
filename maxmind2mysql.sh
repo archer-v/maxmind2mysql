@@ -77,7 +77,7 @@ IGNORE INTO TABLE maxmind_as_info_tmp
 FIELDS TERMINATED BY ',' ENCLOSED BY '\"'
 LINES TERMINATED BY '\n'
 IGNORE 1 LINES
-(@network_cidr, asn, name);
+(@network_cidr, @network_start, @network_end, asn, name);
 
 DROP TABLE maxmind_as_info;
 RENAME TABLE maxmind_as_info_tmp TO maxmind_as_info;
@@ -230,7 +230,7 @@ download_geoip_converter() {
     file_download "$download_url" "$file_pattern"
     d_result=$?
     if [ ${d_result} -eq 1 ]; then
-      exit
+      exit 1
     fi
 
     tar --strip-components=1 -xzf $file_pattern --wildcards "**/${geoip_converter_bin}"
@@ -273,12 +273,13 @@ check_file_in_arch() {
 
 perform_sql_op() {
     echo "Performing SQL request..."
-    echo "$1" | mysql -h"$db_host" -u"$db_user" -p"$db_pass" "$db_name"
+    sql_result=$(echo "$1" | mysql -h"$db_host" -u"$db_user" -p"$db_pass" "$db_name" -N)
+    echo "$sql_result"
 }
 
 convert_csv() {
    file=$1
-   echo "Converting file $file to the format convenient for importing into mysql"
+   echo "Converting the file $file into a format with network_start/network_end fields suitable for importing into MySQL"
    ./geoip2-csv-converter -block-file "$data_dir/$file" -include-hex-range -include-cidr -output-file "$data_dir/$file-t"
    mv -f "$data_dir/$file-t" "$data_dir/$file"
 }
@@ -300,48 +301,60 @@ update_country_data() {
     perform_sql_op "$sql_country"
 }
 
-download_geoip_converter
+  download_geoip_converter
 
-if [ -z "$maxmind_license_key" -o -z "$maxmind_user_id" ]; then
-    echo "maxmind credentials isn't defined in ./config.env"
+  if [ -z "$maxmind_license_key" -o -z "$maxmind_user_id" ]; then
+      echo "maxmind credentials isn't defined in ./config.env"
+      exit 1
+  fi
+
+  file=$maxmind_asn_file
+  file_download "${download_url_prefix}/GeoLite2-ASN-CSV/download?suffix=zip" $file
+  d_result=$?
+  if [ ${d_result} -eq 1 ]; then
     exit 1
-fi
+  fi
 
-file=$maxmind_asn_file
-file_download "${download_url_prefix}/GeoLite2-ASN-CSV/download?suffix=zip" $file
-d_result=$?
-if [ ${d_result} -eq 1 ]; then
-  exit
-fi
+  if [ ${d_result} -eq 0 ]; then
+      force_update=1
+  else 
+      echo "$file file isn't changed"
+  fi
 
-if [ ${d_result} -eq 0 ]; then
-    force_update=1
-else 
-    echo "$file file isn't changed"
-fi
+  file=$maxmind_country_file
+  file_download "${download_url_prefix}/GeoLite2-Country-CSV/download?suffix=zip" $file
+  d_result=$?
+  if [ ${d_result} -eq 1 ]; then
+      exit 1
+  fi
 
-file=$maxmind_country_file
-file_download "${download_url_prefix}/GeoLite2-Country-CSV/download?suffix=zip" $file
-d_result=$?
-if [ ${d_result} -eq 1 ]; then
-  exit
-fi
+  if [ ${d_result} -eq 0 ]; then
+      force_update=1
+  else 
+      echo "$file file isn't changed"
+  fi
 
-if [ ${d_result} -eq 0 ]; then
-    force_update=1
-else 
-    echo "$file file isn't changed"
-fi
+  if [ ${force_update} -eq 0 ]; then
+      echo "$file files isn't changed, update skipped"
+      exit 0
+  fi
 
-if [ ${force_update} -eq 1 ]; then
-    echo "Performing import of updated data from $maxmind_asn_file"
-    update_asn_data
-    echo "Performing import of updated data from $maxmind_country_file"
-    update_country_data
-    echo "Testing..."
-    perform_sql_op "$sql_test_country"
-    perform_sql_op "$sql_test_asn"
-    echo "Done"
-else 
-    echo "$file files isn't changed, update skipped"
-fi
+  echo "Performing import of updated data from $maxmind_asn_file"
+  update_asn_data
+
+  echo "Performing import of updated data from $maxmind_country_file"
+  update_country_data
+
+  echo "Testing..."
+  perform_sql_op "$sql_test_country"
+  if [[ $? -ne 0 || $(echo "$sql_result" | wc -l) -ne 1 ]]; then
+    echo "Test failed 1"
+      exit 1
+  fi
+  perform_sql_op "$sql_test_asn"
+  if [[ $? -ne 0 || $(echo "$sql_result" | wc -l) -ne 1 ]]; then
+      echo "Test failed 2"
+      exit 1
+  fi
+
+  echo "Done"
